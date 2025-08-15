@@ -11,9 +11,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
-    <>
+    <div className="flex flex-col min-h-screen">
       <Navbar />
-      <main className="container mx-auto p-4">
+      <main className="container mx-auto p-4 flex-grow flex flex-col justify-center">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -22,7 +22,7 @@ function App() {
           <Route path="/asignaturas" element={<ProtectedRoute><AsignaturasPage /></ProtectedRoute>} />
         </Routes>
       </main>
-    </>
+    </div>
   );
 }
 
