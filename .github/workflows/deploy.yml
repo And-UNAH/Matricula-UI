@@ -1,0 +1,47 @@
+ 
+     name: Deploy React App to GitHub Pages
+     
+     # Se debe ejecutar en cada push a la rama 'main'
+     on:
+       push:
+         branches:
+           - main 
+     
+     # Permisos para que pueda escribir en la rama gh-pages
+     permissions:
+       contents: write
+    
+
+     jobs:
+        build-and-deploy:
+
+          runs-on: ubuntu-latest
+      
+          steps:
+
+            - name: Checkout code
+              uses: actions/checkout@v4
+      
+ 
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                node-version: '20' 
+                cache: 'npm'
+      
+
+            - name: Install dependencies
+              run: npm install
+      
+
+            - name: Build application
+              run: npm run build
+              env:
+                VITE_API_URL: ${{ secrets.VITE_API_URL }}
+      
+
+            - name: Deploy to GitHub Pages
+              uses: peaceiris/actions-gh-pages@v4
+              with:
+                github_token: ${{ secrets.GITHUB_TOKEN }}
+                publish_dir: ./dist
