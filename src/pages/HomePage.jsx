@@ -3,8 +3,13 @@ import React from 'react';
 
 const HomePage = () => {
   return (
-    <div>
-      <h1 className="text-3xl font-bold underline">Home Page</h1>
+    <div className="bg-white rounded-lg shadow-md p-8 text-center">
+        <h2 className="text-xl font-semibold text-gray-700 mb-4">
+            Selecciona una opción del menú para comenzar
+        </h2>
+        <p className="text-gray-500">
+            Usa el menú de arriba para navegar entre los módulos de PAC y Asignaturas
+        </p>
     </div>
   );
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { getAsignaturas, createAsignatura, updateAsignatura, deleteAsignatura } from '../services/asignaturaService';
 import { getPacs } from '../services/pacService';
+import AsignaturaForm from '../components/AsignaturaForm';
 
 const AsignaturasPage = () => {
   const { token } = useAuth();
@@ -9,9 +10,11 @@ const AsignaturasPage = () => {
   const [pacs, setPacs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isFormVisible, setIsFormVisible] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [currentAsignatura, setCurrentAsignatura] = useState({ id: null, nombre: '', seccion: '', cupos: 0, pacId: '' });
+  const [currentAsignatura, setCurrentAsignatura] = useState(null);
+  const [recentlyUpdated, setRecentlyUpdated] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const fetchAsignaturasAndPacs = async () => {
     try {
@@ -34,54 +37,76 @@ const AsignaturasPage = () => {
     fetchAsignaturasAndPacs();
   }, [token]);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setCurrentAsignatura({ ...currentAsignatura, [name]: value });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const asignaturaData = {
-        nombre: currentAsignatura.nombre,
-        seccion: currentAsignatura.seccion,
-        cupos: parseInt(currentAsignatura.cupos, 10),
-        pacId: currentAsignatura.pacId
-    };
-
-    try {
-      if (isEditing) {
-        await updateAsignatura(currentAsignatura.id, asignaturaData, token);
-      } else {
-        await createAsignatura(asignaturaData, token);
-      }
-      fetchAsignaturasAndPacs();
-      resetForm();
-    } catch (err) {
-      setError(err.message);
+  useEffect(() => {
+    if (recentlyUpdated) {
+        const timer = setTimeout(() => {
+            setRecentlyUpdated(null);
+        }, 2000);
+        return () => clearTimeout(timer);
     }
+  }, [recentlyUpdated]);
+
+  useEffect(() => {
+    if (successMessage) {
+        const timer = setTimeout(() => {
+            setSuccessMessage('');
+        }, 3000);
+        return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
+
+  const handleCreate = () => {
+    setCurrentAsignatura(null);
+    setIsEditing(false);
+    setShowForm(true);
   };
 
   const handleEdit = (asignatura) => {
+    setCurrentAsignatura(asignatura);
     setIsEditing(true);
-    setCurrentAsignatura({ id: asignatura._id, nombre: asignatura.nombre, seccion: asignatura.seccion, cupos: asignatura.cupos, pacId: asignatura.pacId });
-    setIsFormVisible(true);
+    setShowForm(true);
   };
 
-  const handleDelete = async (asignaturaId) => {
-    if (window.confirm('Are you sure you want to delete this asignatura?')) {
+  const handleDelete = async (asignatura) => {
+    if (window.confirm(`¿Estás seguro de eliminar la asignatura "${asignatura.nombre}"?`)) {
       try {
-        await deleteAsignatura(asignaturaId, token);
+        await deleteAsignatura(asignatura._id, token);
         fetchAsignaturasAndPacs();
+        setSuccessMessage('Asignatura eliminada exitosamente');
       } catch (err) {
         setError(err.message);
       }
     }
   };
 
-  const resetForm = () => {
-    setIsEditing(false);
-    setCurrentAsignatura({ id: null, nombre: '', seccion: '', cupos: 0, pacId: '' });
-    setIsFormVisible(false);
+  const handleFormSuccess = async (formData, isEdit) => {
+    try {
+        const asignaturaData = {
+            nombre: formData.nombre,
+            seccion: formData.seccion,
+            cupos: parseInt(formData.cupos, 10),
+            pacId: formData.pacId
+        };
+
+        if (isEdit) {
+            await updateAsignatura(currentAsignatura._id, asignaturaData, token);
+        } else {
+            await createAsignatura(asignaturaData, token);
+        }
+        fetchAsignaturasAndPacs();
+        const message = isEdit ? 'Asignatura actualizada exitosamente' : 'Asignatura creada exitosamente';
+        setSuccessMessage(message);
+        setShowForm(false);
+        setCurrentAsignatura(null);
+        setError('');
+    } catch (err) {
+        setError(err.message);
+    }
+  };
+
+  const handleFormCancel = () => {
+    setShowForm(false);
+    setCurrentAsignatura(null);
   };
 
   const getPacCodeById = (pacId) => {
@@ -89,81 +114,110 @@ const AsignaturasPage = () => {
     return pac ? pac.codigo : 'N/A';
   }
 
-  return (
-    <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Asignaturas Management</h1>
-        <button onClick={() => { setIsFormVisible(true); setIsEditing(false); }} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-          Create Asignatura
-        </button>
-      </div>
-
-      {isFormVisible && (
-        <div className="mb-4 p-4 bg-gray-100 rounded shadow-md">
-          <h2 className="text-xl font-semibold mb-2">{isEditing ? 'Edit Asignatura' : 'Create Asignatura'}</h2>
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label htmlFor="nombre" className="block text-sm font-medium text-gray-700">Name</label>
-                    <input type="text" name="nombre" id="nombre" value={currentAsignatura.nombre} onChange={handleInputChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
-                </div>
-                <div>
-                    <label htmlFor="seccion" className="block text-sm font-medium text-gray-700">Section</label>
-                    <input type="text" name="seccion" id="seccion" value={currentAsignatura.seccion} onChange={handleInputChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
-                </div>
-                <div>
-                    <label htmlFor="cupos" className="block text-sm font-medium text-gray-700">Cupos</label>
-                    <input type="number" name="cupos" id="cupos" value={currentAsignatura.cupos} onChange={handleInputChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
-                </div>
-                <div>
-                    <label htmlFor="pacId" className="block text-sm font-medium text-gray-700">PAC</label>
-                    <select name="pacId" id="pacId" value={currentAsignatura.pacId} onChange={handleInputChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                        <option value="">Select a PAC</option>
-                        {pacs.map(pac => (
-                            <option key={pac._id} value={pac._id}>{pac.codigo}</option>
-                        ))}
-                    </select>
-                </div>
-            </div>
-            <div className="flex justify-end space-x-2 mt-4">
-              <button type="button" onClick={resetForm} className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Cancel</button>
-              <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">{isEditing ? 'Update' : 'Save'}</button>
-            </div>
-          </form>
+  if (isLoading) {
+    return (
+        <div className="flex justify-center items-center min-h-screen">
+            <div className="text-lg text-gray-600">Cargando asignaturas...</div>
         </div>
-      )}
+    );
+  }
 
-      {isLoading && <p>Loading...</p>}
-      {error && <p className="text-red-500">{error}</p>}
+  return (
+    <>
+        <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold text-gray-800">Gestión de Asignaturas</h1>
+            <button
+                onClick={handleCreate}
+                className="bg-pink-500 hover:bg-pink-600 text-white font-medium py-2 px-4 rounded-md transition-colors"
+            >
+                + Nueva Asignatura
+            </button>
+        </div>
 
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Section</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cupos</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PAC</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {asignaturas.map((asignatura) => (
-              <tr key={asignatura._id}>
-                <td className="px-6 py-4 whitespace-nowrap">{asignatura.nombre}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{asignatura.seccion}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{asignatura.cupos}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{getPacCodeById(asignatura.pacId)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                  <button onClick={() => handleEdit(asignatura)} className="text-indigo-600 hover:text-indigo-900">Edit</button>
-                  <button onClick={() => handleDelete(asignatura._id)} className="text-red-600 hover:text-red-900">Delete</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+        {successMessage && (
+            <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-md">
+                <div className="flex items-center">
+                    <span className="mr-2">✅</span>
+                    <span>{successMessage}</span>
+                </div>
+            </div>
+        )}
+
+        {error && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md">
+                <div className="flex items-center">
+                    <span className="mr-2">❌</span>
+                    <span>{error}</span>
+                </div>
+            </div>
+        )}
+
+        <div className="bg-white shadow-md rounded-lg overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                    <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sección</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cupos</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PAC</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                    {asignaturas.length === 0 ? (
+                        <tr>
+                            <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                                No hay asignaturas registradas
+                            </td>
+                        </tr>
+                    ) : (
+                        asignaturas.map((asignatura) => (
+                            <tr 
+                                key={asignatura._id} 
+                                className={`hover:bg-gray-50 transition-colors ${
+                                    recentlyUpdated === asignatura._id 
+                                        ? 'bg-green-50 border-l-4 border-green-400' 
+                                        : ''
+                                }`}
+                            >
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{asignatura.nombre}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{asignatura.seccion}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{asignatura.cupos}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <span className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                        {getPacCodeById(asignatura.pacId)}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <button
+                                        onClick={() => handleEdit(asignatura)}
+                                        className="text-blue-600 hover:text-blue-900 mr-3"
+                                    >
+                                        Editar
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(asignatura)}
+                                        className="text-red-600 hover:text-red-900"
+                                    >
+                                        Eliminar
+                                    </button>
+                                </td>
+                            </tr>
+                        ))
+                    )}
+                </tbody>
+            </table>
+        </div>
+
+        {showForm && (
+            <AsignaturaForm
+                item={currentAsignatura}
+                pacs={pacs}
+                onSuccess={handleFormSuccess}
+                onCancel={handleFormCancel}
+            />
+        )}
+    </>
   );
 };
 
